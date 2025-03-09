@@ -2,6 +2,7 @@
 
 int main(int ac, const char *av[])
 {
+    traceroute *trace = NULL;
     if (ac != 2)
     {
         print_error("Invalid arguments");
@@ -10,6 +11,7 @@ int main(int ac, const char *av[])
     // check the args input if it is --help or if its a host name
     if (strlen(av[1]) == 6 && !strcmp(av[1], "--help"))
         print_help();
-    // run traceroue
-    return (0);   
+    trace = traceroute_setup(av[1]);
+    traceroute_loop(trace);
+    return (0);
 }

@@ -2,7 +2,7 @@ NAME = ft_traceroute
 
 CC = gcc
 
-FLAGS = -Wall -Wextra -Werror
+FLAGS = 
 
 SRC_FOLDER = src
 

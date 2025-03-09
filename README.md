@@ -2,7 +2,7 @@
 Re-coding traceroute command.
 
 - [x] Parse the arguments
-- [ ] setup the socket handlers of hostname/ip address
+- [x] setup the socket handlers of hostname/ip address
 - [ ] create the sending loop of the probe packets
 - [ ] handle responses for the probe packets sent
 - [ ] refactoring code
