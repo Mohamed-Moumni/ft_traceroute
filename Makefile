@@ -8,7 +8,7 @@ SRC_FOLDER = src
 
 OBJ_FOLDER = src
 
-SRC = src/main.c src/utils.c
+SRC = src/main.c src/utils.c src/ft_traceroute.c
 
 HEADER = src/ft_traceroute.h
 
