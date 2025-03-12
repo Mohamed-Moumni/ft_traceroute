@@ -1,99 +1,93 @@
 #include "ft_traceroute.h"
 
+
+void ft_traceroute(traceroute *trace)
+{
+    // create the datagram socket for sending that uses udp
+    // create the raw socket for the receiving that uses icmp
+    // call a method that send and receive via a loop
+
+    int send_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (send_sock < 0)
+    {
+        perror("Send Socket: ");
+        exit(1);
+    }
+    trace->send_sock = send_sock;
+    int recv_sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    if (recv_sock < 0)
+    {
+        perror("Recv Socket: ");
+        exit(1);
+    }
+    trace->recv_sock = recv_sock;
+}
+
 traceroute      *traceroute_setup(const char *hostname)
 {
-    dest_sock           dest_sock = {0};
+    dest_sock           dest_addr = {0};
     traceroute          *trace = NULL;
-    int                 trace_socket;
-    struct sockaddr_in  server_addr;
-    int one = 1;
 
-    dest_sock = get_sock_addr(hostname);
+    dest_addr = get_sock_addr(hostname);
     trace = (struct traceroute_struct *)malloc(sizeof(struct traceroute_struct));
     if (!trace)
         print_error("Malloc: Memory Allocation Error");
-    trace->destina_socket = dest_sock;
-    trace_socket = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
-    if (trace_socket == -1)
-    {
-        free(trace);
-        print_error("Socket Creation Error");
-    }
-    trace->sock = trace_socket;
-    int sock_opt = setsockopt(trace->sock, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one));
-    if (sock_opt < 0)
-    {
-        perror("Sockopt: ");
-        print_error("setsockopt: set socket Option Error");
-    }
-    int raw_sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-    if (raw_sock < 0)
-    {
-        perror("Raw Socket: ");
-    }
-    trace->raw_sock = raw_sock;
+    trace->destina_addr = dest_addr;
     return trace;
 }
 
-void        send_probe_packet(int ttl, unsigned short int  flag, traceroute *trace, probe_packet *probe_pack)
+void traceroute_loop(traceroute *trace)
 {
     char send_buffer[BUFFER];
-    probe_pack->ip_header.iph_ttl = ttl;
-    probe_pack->ip_header.iph_len = sizeof(probe_pack);
-    *((int *)probe_pack->data + 4) = flag;
-    probe_pack->ip_header.iph_chksum = calculate_checksum(probe_pack, sizeof(probe_pack));
-
-    memset(send_buffer, 0, BUFFER);
-    memcpy(send_buffer, probe_pack, BUFFER);
-    int send_res = sendto(trace->sock, send_buffer, BUFFER, 0, trace->destina_socket.dest_addr, trace->destina_socket.addr_len);
-    if (send_res < 0)
-    {
-        perror("SendTo error: ");
-        // print_error("Sendto: Sending Packet Error");   
-    }
-    printf("Packet Sent\n");
-}
-
-void        receive_probe_packet(traceroute *trace, probe_packet *probe_pack)
-{
-    printf("Recv Packet\n");
     char recv_buffer[BUFFER];
-    ip_header *ip_head;
-    dest_sock recv_dest;
-    unsigned char *payload;
+    struct ip *ip_head;
+    struct icmp * payload;
+    struct sockaddr_in recv_addr;
+    socklen_t addr_len;
 
-    int receive_res = recvfrom(trace->raw_sock, recv_buffer, BUFFER, 0, recv_dest.dest_addr, &recv_dest.addr_len);
-    if (receive_res < 0)
-        print_error("RecvFrom: Receive Packet Error");
+    for (int ttl = 1; ttl <= MAX_HOPS; ttl++)
+    {
+        printf("--------------------TTL-----------------------\n");
+        printf("ttl: %d\n", ttl);
+        memset(send_buffer, 0, BUFFER);
+        if (setsockopt(trace->send_sock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) == -1) {
+            perror ("ping: can't set unicast time-to-live");
+            exit(2);
+        }
+        int send_res = sendto(trace->send_sock, send_buffer, BUFFER, 0, (struct sockaddr *)trace->destina_addr.dest_addr, trace->destina_addr.addr_len);
+        if (send_res < 0)
+        {
+            perror("SendTo error: ");
+            exit(1);
+        }
+    
+        struct timeval timeout = {TIMEOUT, 0};
+        if (setsockopt(trace->recv_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            perror("setsockopt :");
+        }
+        int receive_res = recvfrom(trace->recv_sock, recv_buffer, BUFFER, 0, (struct sockaddr *)&recv_addr, &addr_len);
+        if (receive_res < 0)
+        {
+            perror("recvfrom :");
+        }
 
-    ip_head = (ip_header *)recv_buffer;
-    payload = (unsigned char *)(recv_buffer + 20);
-    int traceroute_id = *((int *)payload);
-    int flag = *((unsigned short int *)(payload + 4));
-
-    printf("___________________________ IP HEADER _________________________\n");
-    printf("IP Header Fields:\n");
-    printf("Version: %u\n", ip_head->iph_ver);
-    printf("Header Length: %u (in words, so %u bytes)\n", ip_head->iph_ihl, ip_head->iph_ihl * 4);
-    printf("Type of Service: %u\n", ip_head->iph_tos);
-    printf("Total Length: %u\n", ip_head->iph_len);
-    printf("Identification: %u\n", ip_head->iph_ident);
-    printf("Flags: %u\n", ip_head->iph_flag);
-    printf("Fragment Offset: %u\n", ip_head->iph_offset);
-    printf("Time to Live: %u\n", ip_head->iph_ttl);
-    printf("Protocol: %u\n", ip_head->iph_protocol);
-    printf("Checksum: 0x%04X\n", ip_head->iph_chksum);
-    printf("Source IP: %u.%u.%u.%u\n",
-           (ip_head->iph_sourceip >> 24) & 0xFF,
-           (ip_head->iph_sourceip >> 16) & 0xFF,
-           (ip_head->iph_sourceip >> 8) & 0xFF,
-           ip_head->iph_sourceip & 0xFF);
-    printf("Destination IP: %u.%u.%u.%u\n",
-           (ip_head->iph_destip >> 24) & 0xFF,
-           (ip_head->iph_destip >> 16) & 0xFF,
-           (ip_head->iph_destip >> 8) & 0xFF,
-           ip_head->iph_destip & 0xFF);
-    printf("___________________________Payload ________________________\n");
-    printf("PID: %d\n", traceroute_id);
-    printf("FLAG: %d\n", flag);
+        ip_head = (struct ip *)recv_buffer;
+        payload = (struct icmp *)(recv_buffer + ip_head->ip_hl * 4);
+    
+        printf("IP Header:\n");
+        printf("  Version        : %d\n", ip_head->ip_v);
+        printf("  Header Length  : %d bytes\n", ip_head->ip_hl * 4);
+        printf("  Type of Service: %d\n", ip_head->ip_tos);
+        printf("  Total Length   : %d\n", ntohs(ip_head->ip_len));
+        printf("  Identification : %d\n", ntohs(ip_head->ip_id));
+        printf("  Fragment Offset: %d\n", ntohs(ip_head->ip_off));
+        printf("  Time to Live   : %d\n", ip_head->ip_ttl);
+        printf("  Protocol       : %d\n", ip_head->ip_p);
+        printf("  Header Checksum: %d\n", ntohs(ip_head->ip_sum));
+        printf("  Source IP      : %s\n", inet_ntoa(ip_head->ip_src));
+        printf("  Destination IP : %s\n", inet_ntoa(ip_head->ip_dst));
+    
+        printf("type: %d\n", payload->icmp_type);
+        printf("code: %d\n", payload->icmp_code);
+    }
 }
