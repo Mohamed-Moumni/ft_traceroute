@@ -12,6 +12,5 @@ int main(int ac, const char *av[])
         print_help();
     trace = traceroute_setup(av[1]);
     ft_traceroute(trace);
-    traceroute_loop(trace);
     return (0);
 }

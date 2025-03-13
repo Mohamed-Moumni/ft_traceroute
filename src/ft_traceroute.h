@@ -16,10 +16,12 @@
 #include <errno.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/udp.h>
+#include <stdbool.h>
 
-#define BUFFER 32
-#define TIMEOUT 5
-#define MAX_HOPS 64
+#define BUFFER 1024
+#define TIMEOUT 1
+#define MAX_HOPS 30
 
 typedef struct destination_sock
 {
@@ -32,6 +34,7 @@ typedef struct traceroute_struct
     int send_sock;
     int recv_sock;
     dest_sock destina_addr;
+    int dest_port;
 } traceroute;
 
 void print_error(const char *format, ...);
@@ -43,7 +46,8 @@ traceroute *traceroute_setup(const char *hostname);
 unsigned short calculate_checksum(void *b, int len);
 void ft_traceroute(traceroute *trace);
 void traceroute_loop(traceroute *trace);
-
+double get_rtt_probe_packet(const struct timeval time);
+void print_trace(int ttl, const char *addr, double rtt, bool flushed);
 // Troubleshooting
 
 void print_ip_header_struct(struct ip *ip_head);

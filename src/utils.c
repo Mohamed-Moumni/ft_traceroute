@@ -43,7 +43,6 @@ dest_sock get_sock_addr(const char *target_host)
             if (!dest_sock_addr.dest_addr)
                 print_error("Malloc: Memory Allocation Error");
             memcpy(dest_sock_addr.dest_addr, rp->ai_addr, rp->ai_addrlen);
-            dest_sock_addr.dest_addr->sin_port = htons(33455);
             dest_sock_addr.addr_len = rp->ai_addrlen;
             freeaddrinfo(result);
             return dest_sock_addr;
@@ -52,4 +51,35 @@ dest_sock get_sock_addr(const char *target_host)
     freeaddrinfo(result);
     print_error("unknown host %s", target_host);
     return dest_sock_addr;
+}
+
+double get_rtt_probe_packet(const struct timeval time)
+{
+    struct timeval  currentime;
+    double    rtt;
+
+    if (gettimeofday(&currentime, NULL) < 0)
+    {
+        perror("Get Time Of Day Failed: ");
+        exit(1);
+    }
+    return ((currentime.tv_sec - time.tv_sec) * 1000 + (currentime.tv_usec - time.tv_usec) * 0.001);
+}
+
+void print_router(double rtt)
+{
+    printf("%.2f ms", rtt);
+    fflush(stdout);
+}
+void print_trace(int ttl, const char *addr, double rtt, bool flushed)
+{
+    if (!flushed)
+    {
+        printf("%d  %s (%s) %.2f ms ", ttl, addr, addr, rtt);
+    }
+    else
+    {
+        printf("%.2f ms ", rtt);
+    }
+    fflush(stdout);
 }
