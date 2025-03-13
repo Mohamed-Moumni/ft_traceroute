@@ -20,7 +20,7 @@
 #include <stdbool.h>
 
 #define BUFFER 1024
-#define TIMEOUT 1
+#define TIMEOUT 5
 #define MAX_HOPS 30
 
 typedef struct destination_sock

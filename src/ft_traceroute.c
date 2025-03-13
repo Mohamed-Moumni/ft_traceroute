@@ -49,6 +49,13 @@ void traceroute_loop(traceroute *trace)
     double rtt;
     bool flushed;
 
+    trace->destina_addr.dest_addr->sin_family = AF_INET;
+    trace->destina_addr.dest_addr->sin_port = htons(trace->dest_port);
+    struct timeval timeout = {TIMEOUT, 0};
+    if (setsockopt(trace->recv_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
+    {
+        perror("setsockopt :");
+    }
     for (int ttl = 1; ttl <= MAX_HOPS; ttl++)
     {
         flushed = false;
@@ -64,19 +71,11 @@ void traceroute_loop(traceroute *trace)
                 exit(1);
             }
 
-            trace->destina_addr.dest_addr->sin_family = AF_INET;
-            trace->destina_addr.dest_addr->sin_port = htons(trace->dest_port);
             int send_res = sendto(trace->send_sock, NULL, 0, 0, (struct sockaddr *)trace->destina_addr.dest_addr, trace->destina_addr.addr_len);
             if (send_res < 0)
             {
                 perror("SendTo error: ");
                 exit(1);
-            }
-
-            struct timeval timeout = {TIMEOUT, 0};
-            if (setsockopt(trace->recv_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
-            {
-                perror("setsockopt :");
             }
             int receive_res = recvfrom(trace->recv_sock, recv_buffer, BUFFER, 0, (struct sockaddr *)&recv_addr, &addr_len);
             if (receive_res < 0)
@@ -84,7 +83,8 @@ void traceroute_loop(traceroute *trace)
                 if (errno == EAGAIN || errno == EWOULDBLOCK)
                 {
                     // print_trace(ttl, inet_ntoa(ip_head->ip_src), rtt, flushed);
-                    printf("*\n");
+                    printf("* ");
+                    fflush(stdout);
                 }
                 else
                 {
@@ -104,8 +104,8 @@ void traceroute_loop(traceroute *trace)
                 if (ntohs(udp_header->uh_dport) == trace->dest_port)
                 {
                     rtt = get_rtt_probe_packet(start_time);
+                    print_trace(ttl, inet_ntoa(ip_head->ip_src), rtt, flushed);
                 }
-                print_trace(ttl, inet_ntoa(ip_head->ip_src), rtt, flushed);   
             }
             else if (icmp_header->icmp_type == ICMP_UNREACH_PORT)
             {
@@ -117,8 +117,8 @@ void traceroute_loop(traceroute *trace)
                 if (ntohs(udp_header->uh_dport) == trace->dest_port)
                 {
                     rtt = get_rtt_probe_packet(start_time);
+                    print_trace(ttl, inet_ntoa(ip_head->ip_src), rtt, flushed);
                 }
-                print_trace(ttl, inet_ntoa(ip_head->ip_src), rtt, flushed);
                 exit(0);
             }
             flushed = true;
