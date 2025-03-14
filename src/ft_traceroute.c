@@ -41,7 +41,7 @@ traceroute      *traceroute_setup(const char *hostname)
     return trace;
 }
 
-int recv_packet(traceroute *trace, int ppacket, int counter)
+int recv_packet(traceroute *trace, int ppacket, int seq)
 {
     char                recv_buffer[BUFFER];
     struct ip           *ip_head, *orig_ip_header;
@@ -76,7 +76,7 @@ int recv_packet(traceroute *trace, int ppacket, int counter)
 
     if (icmp_header->icmp_type == ICMP_TIMXCEED || icmp_header->icmp_type == ICMP_UNREACH_PORT)
     {
-        if (htons(udp_header->uh_sport) == trace->src_port && (htons(udp_header->uh_dport) - counter) == DEST_PORT)
+        if (htons(udp_header->uh_sport) == trace->src_port && (htons(udp_header->uh_dport) - seq) == DEST_PORT)
         {
             ip_addr = inet_ntoa(ip_head->ip_src);
             if (ppacket && strcmp(ip_addr, last_addr_host))
@@ -103,11 +103,11 @@ int recv_packet(traceroute *trace, int ppacket, int counter)
 
 void traceroute_loop(traceroute *trace)
 {
-    struct timeval start_time;
-    struct timeval timeout = {TIMEOUT, 0};
-    int counter;
+    struct timeval  start_time;
+    struct timeval  timeout = {TIMEOUT, 0};
+    int             seq;
 
-    counter = 0;
+    seq = 0;
     if (setsockopt(trace->recv_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("setsockopt :");
         exit(1);
@@ -122,7 +122,7 @@ void traceroute_loop(traceroute *trace)
         }
         for (int ppacket=0; ppacket < PROBE_PACK; ppacket++)
         {
-            trace->destina_addr.dest_addr->sin_port = htons(DEST_PORT + counter);
+            trace->destina_addr.dest_addr->sin_port = htons(DEST_PORT + seq);
             gettimeofday(&start_time, NULL);
             int send_res = sendto(trace->send_sock, NULL, 0, 0, (struct sockaddr *)trace->destina_addr.dest_addr, trace->destina_addr.addr_len);
             if (send_res < 0)
@@ -130,14 +130,18 @@ void traceroute_loop(traceroute *trace)
                 perror("SendTo : ");
                 exit(1);
             }
-            int rec = recv_packet(trace, ppacket, counter);
-            print_rtt(&start_time);
-            if (rec == 2)
-            {
-                printf("\n");
-                exit(0);
+            int rec = recv_packet(trace, ppacket, seq);
+            switch (rec) {
+                case 0:
+                    print_rtt(&start_time);
+                    break;
+                case 2:
+                    printf("\n");
+                    exit(0);
+                default:
+                    break;
             }
-            counter++;
+            seq++;
         }
         printf("\n");
         memset(last_addr_host, 0, BUFFER);

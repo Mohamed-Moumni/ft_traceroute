@@ -59,6 +59,7 @@ void traceroute_loop(traceroute *trace);
 void print_ip_header_struct(struct ip *ip_head);
 void print_rtt(struct timeval *time_start);
 void print_router_ip(struct ip * ip_head, char *ip_addr);
+int recv_packet(traceroute *trace, int ppacket, int seq);
 
 
 #endif
